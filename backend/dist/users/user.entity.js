@@ -46,7 +46,7 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "role", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => truck_entity_1.Truck, { nullable: true }),
+    (0, typeorm_1.ManyToOne)(() => truck_entity_1.Truck, { nullable: true, onDelete: 'SET NULL' }),
     __metadata("design:type", truck_entity_1.Truck)
 ], User.prototype, "truck", void 0);
 exports.User = User = __decorate([

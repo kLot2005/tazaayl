@@ -7,6 +7,6 @@ export declare class TelegramUpdate {
     private streetZonesService;
     constructor(subscriberRepository: Repository<TelegramSubscriber>, streetZonesService: StreetZonesService);
     onStart(ctx: Scenes.SceneContext): Promise<void>;
-    onAction(ctx: any): Promise<void>;
-    sendNotificationToZone(zoneId: number, message: string): Promise<void>;
+    onLocation(ctx: any): Promise<any>;
+    onText(ctx: any): Promise<void>;
 }

@@ -38,6 +38,9 @@ export class TrucksController {
 
             return {
                 ...truck,
+                truckId: truck.id,
+                latitude: truck.currentLat,
+                longitude: truck.currentLon,
                 driver: driver ? { id: driver.id, username: driver.username } : null,
                 zones: route ? route.zones : []
             };

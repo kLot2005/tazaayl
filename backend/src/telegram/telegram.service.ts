@@ -18,11 +18,14 @@ export class TelegramService {
             where: { zone: { id: zoneId }, isActive: true },
         });
 
+        console.log(`[TelegramService] Found ${subscribers.length} active subscribers for zone ${zoneId}`);
+
         for (const sub of subscribers) {
             try {
                 await this.bot.telegram.sendMessage(sub.chatId.toString(), message);
+                console.log(`[TelegramService] Notification sent to chatId: ${sub.chatId}`);
             } catch (e) {
-                console.error(`Failed to send message to ${sub.chatId}:`, e);
+                console.error(`[TelegramService] FAILED to send message to ${sub.chatId}:`, e.message);
             }
         }
     }

@@ -7,7 +7,7 @@ export class GpsPoint {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => Truck)
+    @ManyToOne(() => Truck, { onDelete: 'CASCADE' })
     @Index()
     truck: Truck;
 

@@ -45,7 +45,11 @@ let ShiftsService = class ShiftsService {
             isActive: true,
             startTime: new Date()
         });
-        return this.shiftsRepository.save(shift);
+        const savedShift = await this.shiftsRepository.save(shift);
+        return this.shiftsRepository.findOne({
+            where: { id: savedShift.id },
+            relations: ['truck']
+        });
     }
     async endShift(userId) {
         const activeShift = await this.shiftsRepository.findOne({

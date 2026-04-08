@@ -27,35 +27,46 @@ let TelegramUpdate = class TelegramUpdate {
         this.streetZonesService = streetZonesService;
     }
     async onStart(ctx) {
-        const zones = await this.streetZonesService.findAll();
-        const keyboard = zones.map(z => [{ text: `Подписаться на: ${z.id}`, callback_data: `subscribe_${z.id}` }]);
-        await ctx.reply('Добро пожаловать в Tazaayl! Выберите ID зоны вашей улицы для подписки на уведомления о мусоровозе:', {
+        console.log(`[TelegramBot] Start command from chatId: ${ctx.chat?.id}`);
+        await ctx.reply('👋 Добро пожаловать в сервис Tazaayl!\n\nЧтобы получать уведомления о прибытии мусоровоза, пожалуйста, отправьте ваше местоположение (геолокацию).', {
             reply_markup: {
-                inline_keyboard: keyboard,
+                keyboard: [
+                    [{ text: '📍 Отправить местоположение', request_location: true }]
+                ],
+                resize_keyboard: true,
+                one_time_keyboard: true
             },
         });
     }
-    async onAction(ctx) {
-        const data = ctx.update.callback_query.data;
-        if (data.startsWith('subscribe_')) {
-            const zoneId = parseInt(data.split('_')[1]);
-            const chatId = ctx.update.callback_query.message.chat.id;
-            let subscriber = await this.subscriberRepository.findOneBy({ chatId });
-            if (subscriber) {
-                subscriber.zone = { id: zoneId };
-            }
-            else {
-                subscriber = this.subscriberRepository.create({ chatId, zone: { id: zoneId } });
-            }
-            await this.subscriberRepository.save(subscriber);
-            await ctx.answerCbQuery('Вы успешно подписались!');
-            await ctx.reply(`Вы подписаны на уведомления для зоны #${zoneId}. Мы сообщим, когда мусоровоз будет рядом!`);
+    async onLocation(ctx) {
+        const { latitude, longitude } = ctx.message.location;
+        const chatId = ctx.chat.id.toString();
+        console.log(`[TelegramBot] Received location from chatId: ${chatId} (${latitude}, ${longitude})`);
+        const zone = await this.streetZonesService.findContainingZone(longitude, latitude);
+        if (!zone) {
+            console.log(`[TelegramBot] Zone NOT FOUND for coordinates of chatId: ${chatId}`);
+            return ctx.reply('😔 К сожалению, ваш адрес пока не входит в зону обслуживания системы Tazaayl. Мы работаем над расширением!');
         }
-    }
-    async sendNotificationToZone(zoneId, message) {
-        const subscribers = await this.subscriberRepository.find({
-            where: { zone: { id: zoneId }, isActive: true },
+        console.log(`[TelegramBot] Found zone "${zone.name}" for chatId: ${chatId}`);
+        let subscriber = await this.subscriberRepository.findOneBy({ chatId });
+        if (subscriber) {
+            subscriber.zone = zone;
+        }
+        else {
+            subscriber = this.subscriberRepository.create({
+                chatId,
+                zone,
+                isActive: true
+            });
+        }
+        await this.subscriberRepository.save(subscriber);
+        console.log(`[TelegramBot] Subscriber ${chatId} successfully saved/updated for zone ${zone.id}`);
+        await ctx.reply(`✅ Готово! Вы успешно подписаны на уведомления для зоны: "${zone.name}".\n\nМы сообщим вам в Telegram, как только мусоровоз выедет на вашу улицу! 🚛`, {
+            reply_markup: { remove_keyboard: true }
         });
+    }
+    async onText(ctx) {
+        await ctx.reply('Пожалуйста, используйте кнопку "📍 Отправить местоположение" для настройки уведомлений или введите /start');
     }
 };
 exports.TelegramUpdate = TelegramUpdate;
@@ -67,12 +78,19 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], TelegramUpdate.prototype, "onStart", null);
 __decorate([
-    (0, nestjs_telegraf_1.On)('callback_query'),
+    (0, nestjs_telegraf_1.On)('location'),
     __param(0, (0, nestjs_telegraf_1.Ctx)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
-], TelegramUpdate.prototype, "onAction", null);
+], TelegramUpdate.prototype, "onLocation", null);
+__decorate([
+    (0, nestjs_telegraf_1.On)('text'),
+    __param(0, (0, nestjs_telegraf_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], TelegramUpdate.prototype, "onText", null);
 exports.TelegramUpdate = TelegramUpdate = __decorate([
     (0, nestjs_telegraf_1.Update)(),
     __param(0, (0, typeorm_1.InjectRepository)(subscriber_entity_1.TelegramSubscriber)),

@@ -9,6 +9,9 @@ export declare class TrucksController {
     constructor(trucksService: TrucksService, usersService: UsersService, routesService: RoutesService);
     create(truck: Partial<Truck>): Promise<Truck>;
     findAll(): Promise<{
+        truckId: number;
+        latitude: number;
+        longitude: number;
         driver: {
             id: number;
             username: string;
@@ -19,6 +22,8 @@ export declare class TrucksController {
         model: string;
         status: import("./truck.entity").TruckStatus;
         capacity: number;
+        currentLat: number;
+        currentLon: number;
     }[]>;
     findOne(id: string): Promise<Truck | null>;
     update(id: string, truck: Partial<Truck>): Promise<Truck | null>;

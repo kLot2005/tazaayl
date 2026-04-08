@@ -9,7 +9,7 @@ export class TelegramSubscriber {
     @Column({ type: 'bigint', unique: true })
     chatId: number;
 
-    @ManyToOne(() => StreetZone)
+    @ManyToOne(() => StreetZone, { onDelete: 'CASCADE' })
     @Index()
     zone: StreetZone;
 

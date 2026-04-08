@@ -9,4 +9,6 @@ export declare class Truck {
     model: string;
     status: TruckStatus;
     capacity: number;
+    currentLat: number;
+    currentLon: number;
 }

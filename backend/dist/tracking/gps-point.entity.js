@@ -58,7 +58,7 @@ __decorate([
     __metadata("design:type", Number)
 ], GpsPoint.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => truck_entity_1.Truck),
+    (0, typeorm_1.ManyToOne)(() => truck_entity_1.Truck, { onDelete: 'CASCADE' }),
     (0, typeorm_1.Index)(),
     __metadata("design:type", truck_entity_1.Truck)
 ], GpsPoint.prototype, "truck", void 0);

@@ -28,7 +28,7 @@ __decorate([
     __metadata("design:type", Number)
 ], TelegramSubscriber.prototype, "chatId", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => street_zone_entity_1.StreetZone),
+    (0, typeorm_1.ManyToOne)(() => street_zone_entity_1.StreetZone, { onDelete: 'CASCADE' }),
     (0, typeorm_1.Index)(),
     __metadata("design:type", street_zone_entity_1.StreetZone)
 ], TelegramSubscriber.prototype, "zone", void 0);

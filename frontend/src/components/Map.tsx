@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import React from 'react';
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -16,11 +17,16 @@ interface MapProps {
     onDrawComplete?: (polygon: any) => void;
 }
 
-export default function Map({ zones = [], trucks = [], isDrawing = false, onDrawComplete }: MapProps) {
+const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComplete }: MapProps) => {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map | null>(null);
     const draw = useRef<any>(null);
     const [styleLoaded, setStyleLoaded] = useState(false);
+
+    const onDrawCompleteRef = useRef(onDrawComplete);
+    useEffect(() => {
+        onDrawCompleteRef.current = onDrawComplete;
+    }, [onDrawComplete]);
 
     const isTokenValid = MAPBOX_TOKEN && MAPBOX_TOKEN.length > 50 && !MAPBOX_TOKEN.includes('YOUR_MAPBOX');
 
@@ -50,6 +56,12 @@ export default function Map({ zones = [], trucks = [], isDrawing = false, onDraw
                     'filter': ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
                     'layout': { 'line-cap': 'round', 'line-join': 'round' },
                     'paint': { 'line-color': '#10b981', 'line-width': 3 }
+                },
+                {
+                    'id': 'gl-draw-polygon-and-line-vertex-active',
+                    'type': 'circle',
+                    'filter': ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point'], ['!=', 'mode', 'static']],
+                    'paint': { 'circle-radius': 6, 'circle-color': '#fbbf24', 'circle-stroke-width': 2, 'circle-stroke-color': '#000' }
                 }
             ]
         });
@@ -59,60 +71,52 @@ export default function Map({ zones = [], trucks = [], isDrawing = false, onDraw
 
         const onMapLoad = () => {
             if (!map.current) return;
+            console.log('[Map] Style loaded, initializing layers...');
             setStyleLoaded(true);
 
-            // Зоны - Заливка (использует цвет из properties)
+            // Зоны
             if (!map.current.getSource('zones')) {
                 map.current.addSource('zones', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-
                 map.current.addLayer({
-                    id: 'zones-fill',
-                    type: 'fill',
-                    source: 'zones',
-                    paint: {
-                        'fill-color': ['get', 'color'],
-                        'fill-opacity': 0.2
-                    }
+                    id: 'zones-fill', type: 'fill', source: 'zones',
+                    paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.2 }
                 });
-
                 map.current.addLayer({
-                    id: 'zones-outline',
-                    type: 'line',
-                    source: 'zones',
-                    paint: {
-                        'line-color': ['get', 'color'],
-                        'line-width': 2,
-                        'line-opacity': 0.8
-                    }
-                });
-
-                // Слой для названий зон
-                map.current.addLayer({
-                    id: 'zones-labels',
-                    type: 'symbol',
-                    source: 'zones',
-                    layout: {
-                        'text-field': ['get', 'name'],
-                        'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-                        'text-size': 10,
-                        'text-letter-spacing': 0.05,
-                        'text-offset': [0, 0],
-                        'text-anchor': 'center'
-                    },
-                    paint: {
-                        'text-color': '#ffffff',
-                        'text-halo-color': 'rgba(0,0,0,0.8)',
-                        'text-halo-width': 2
-                    }
+                    id: 'zones-outline', type: 'line', source: 'zones',
+                    paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-opacity': 0.8 }
                 });
             }
 
-            // Машины
+            // Машины (Source)
             if (!map.current.getSource('trucks')) {
                 map.current.addSource('trucks', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+
+                // Слой точки
                 map.current.addLayer({
-                    id: 'trucks-point', type: 'circle', source: 'trucks', paint: {
-                        'circle-radius': 8, 'circle-color': '#fbbf24', 'circle-stroke-width': 2, 'circle-stroke-color': '#000', 'circle-opacity': 0.9
+                    id: 'trucks-point', type: 'circle', source: 'trucks',
+                    paint: {
+                        'circle-radius': 10,
+                        'circle-color': '#fbbf24',
+                        'circle-stroke-width': 3,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-opacity': 1
+                    }
+                });
+
+                // Слой номера машины
+                map.current.addLayer({
+                    id: 'trucks-labels', type: 'symbol', source: 'trucks',
+                    layout: {
+                        'text-field': ['get', 'plate'],
+                        'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 10,
+                        'text-offset': [0, 1.5],
+                        'text-anchor': 'top'
+                    },
+                    paint: {
+                        'text-color': '#fbbf24',
+                        'text-halo-color': '#000000',
+                        'text-halo-width': 2
                     }
                 });
             }
@@ -122,19 +126,15 @@ export default function Map({ zones = [], trucks = [], isDrawing = false, onDraw
         };
 
         map.current.on('style.load', onMapLoad);
+        map.current.on('load', onMapLoad);
 
         map.current.on('draw.create', (e: any) => {
             const feature = e.features[0];
-            if (onDrawComplete) onDrawComplete(feature.geometry);
+            if (onDrawCompleteRef.current) onDrawCompleteRef.current(feature.geometry);
         });
 
-        return () => {
-            if (map.current) {
-                map.current.remove();
-                map.current = null;
-            }
-        };
-    }, [isTokenValid, onDrawComplete]);
+        return () => { };
+    }, [isTokenValid]);
 
     useEffect(() => {
         if (!draw.current || !map.current || !styleLoaded) return;
@@ -154,14 +154,10 @@ export default function Map({ zones = [], trucks = [], isDrawing = false, onDraw
         if (source) {
             source.setData({
                 type: 'FeatureCollection',
-                features: zonesData.map(z => ({
+                features: (zonesData || []).map(z => ({
                     type: 'Feature',
                     geometry: z.boundary,
-                    properties: {
-                        id: z.id,
-                        name: z.name || 'Unnamed',
-                        color: z.color || '#10b981'
-                    }
+                    properties: { id: z.id, name: z.name || 'Unnamed', color: z.color || '#10b981' }
                 }))
             });
         }
@@ -171,12 +167,16 @@ export default function Map({ zones = [], trucks = [], isDrawing = false, onDraw
         if (!map.current || !styleLoaded) return;
         const source = map.current.getSource('trucks') as mapboxgl.GeoJSONSource;
         if (source) {
+            console.log('[Map] Syncing trucks on map:', trucksData);
             source.setData({
                 type: 'FeatureCollection',
-                features: trucksData.map(t => ({
+                features: (trucksData || []).filter(t => t.latitude && t.longitude).map(t => ({
                     type: 'Feature',
-                    geometry: { type: 'Point', coordinates: [t.longitude, t.latitude] },
-                    properties: { id: t.truckId }
+                    geometry: { type: 'Point', coordinates: [Number(t.longitude), Number(t.latitude)] },
+                    properties: {
+                        id: t.truckId,
+                        plate: t.plateNumber || `ID:${t.truckId}`
+                    }
                 }))
             });
         }
@@ -198,3 +198,5 @@ export default function Map({ zones = [], trucks = [], isDrawing = false, onDraw
 
     return <div ref={mapContainer} className="w-full h-full bg-zinc-950 rounded-2xl" />;
 }
+
+export default memo(MapComponent);

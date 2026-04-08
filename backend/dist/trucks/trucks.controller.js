@@ -42,6 +42,9 @@ let TrucksController = class TrucksController {
             const route = await this.routesService.findCurrentRouteForTruck(truck.id);
             return {
                 ...truck,
+                truckId: truck.id,
+                latitude: truck.currentLat,
+                longitude: truck.currentLon,
                 driver: driver ? { id: driver.id, username: driver.username } : null,
                 zones: route ? route.zones : []
             };

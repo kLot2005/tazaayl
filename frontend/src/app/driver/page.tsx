@@ -41,14 +41,25 @@ export default function DriverPage() {
                 setActiveShift(shiftRes.data);
                 setRoute(routeRes.data);
             } catch (err) {
-                console.error('Failed to fetch driver data');
+                console.error('[DriverPage] Data fetch error:', err);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-        const s = io('http://localhost:3005');
+
+        // Автоматически определяем адрес бэкенда из конфига API
+        const socketUrl = 'http://localhost:3005';
+        console.log('[DriverPage] Connecting to socket:', socketUrl);
+        const s = io(socketUrl, {
+            transports: ['websocket', 'polling'],
+            reconnection: true
+        });
+
+        s.on('connect', () => console.log('[DriverPage] Socket CONNECTED:', s.id));
+        s.on('connect_error', (err: any) => console.error('[DriverPage] Socket Connection Error:', err));
+
         setSocket(s);
         return () => { s.disconnect(); };
     }, [router]);
@@ -56,20 +67,35 @@ export default function DriverPage() {
     // GPS Tracking Loop
     useEffect(() => {
         let watchId: number;
-        if (activeShift && socket) {
+        console.log('[DriverPage] Tracking Effect:', { hasShift: !!activeShift, hasSocket: !!socket });
+
+        if (activeShift && socket && activeShift.truck?.id) {
+            console.log('[DriverPage] GPS tracking START for Truck:', activeShift.truck.id);
             setGpsActive(true);
-            watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const coords = {
-                        truckId: activeShift.truck.id,
-                        latitude: pos.coords.latitude,
-                        longitude: pos.coords.longitude
-                    };
-                    setLastPos(coords);
-                    socket.emit('updateLocation', coords);
-                },
-                (err) => console.error('GPS Error:', err),
+
+            const sendUpdate = (pos: GeolocationPosition) => {
+                const coords = {
+                    truckId: activeShift.truck.id,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
+                };
+                console.log('[DriverPage] GPS Update Sending:', coords);
+                socket.emit('updateLocation', coords);
+                setLastPos(coords);
+            };
+
+            // 1. Сразу получаем текущую позицию
+            navigator.geolocation.getCurrentPosition(
+                sendUpdate,
+                (err) => console.error('[DriverPage] Initial GPS Error:', err),
                 { enableHighAccuracy: true }
+            );
+
+            // 2. Начинаем слежение
+            watchId = navigator.geolocation.watchPosition(
+                sendUpdate,
+                (err) => console.error('[DriverPage] Watch GPS Error:', err),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         } else {
             setGpsActive(false);

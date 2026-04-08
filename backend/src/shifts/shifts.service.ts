@@ -38,7 +38,13 @@ export class ShiftsService {
             startTime: new Date()
         });
 
-        return this.shiftsRepository.save(shift);
+        const savedShift = await this.shiftsRepository.save(shift);
+
+        // Возвращаем смену с подгруженными данными о машине
+        return this.shiftsRepository.findOne({
+            where: { id: savedShift.id },
+            relations: ['truck']
+        });
     }
 
     async endShift(userId: number) {

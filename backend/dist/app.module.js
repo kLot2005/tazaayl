@@ -19,12 +19,14 @@ const routes_module_1 = require("./routes/routes.module");
 const tracking_module_1 = require("./tracking/tracking.module");
 const telegram_module_1 = require("./telegram/telegram.module");
 const shifts_module_1 = require("./shifts/shifts.module");
+const config_1 = require("@nestjs/config");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
+            config_1.ConfigModule.forRoot({ isGlobal: true }),
             typeorm_1.TypeOrmModule.forRoot({
                 type: 'postgres',
                 host: 'localhost',

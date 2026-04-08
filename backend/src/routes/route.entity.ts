@@ -10,7 +10,7 @@ export class Route {
     @Column({ type: 'date' })
     date: string;
 
-    @ManyToOne(() => Truck)
+    @ManyToOne(() => Truck, { nullable: true, onDelete: 'SET NULL' })
     truck: Truck;
 
     @ManyToMany(() => StreetZone)

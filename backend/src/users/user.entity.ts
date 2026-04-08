@@ -24,6 +24,6 @@ export class User {
     })
     role: UserRole;
 
-    @ManyToOne(() => Truck, { nullable: true })
+    @ManyToOne(() => Truck, { nullable: true, onDelete: 'SET NULL' })
     truck: Truck;
 }

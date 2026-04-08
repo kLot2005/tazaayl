@@ -10,7 +10,7 @@ export class Shift {
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     user: User; // Было driver, исправил на user
 
-    @ManyToOne(() => Truck)
+    @ManyToOne(() => Truck, { nullable: true, onDelete: 'SET NULL' })
     truck: Truck;
 
     @Column({ type: 'timestamp' })

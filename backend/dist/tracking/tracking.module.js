@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const tracking_gateway_1 = require("./tracking.gateway");
 const gps_point_entity_1 = require("./gps-point.entity");
+const truck_entity_1 = require("../trucks/truck.entity");
 const street_zones_module_1 = require("../street-zones/street-zones.module");
 const telegram_module_1 = require("../telegram/telegram.module");
 let TrackingModule = class TrackingModule {
@@ -19,7 +20,7 @@ exports.TrackingModule = TrackingModule;
 exports.TrackingModule = TrackingModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([gps_point_entity_1.GpsPoint]),
+            typeorm_1.TypeOrmModule.forFeature([gps_point_entity_1.GpsPoint, truck_entity_1.Truck]),
             street_zones_module_1.StreetZonesModule,
             telegram_module_1.TelegramModule,
         ],

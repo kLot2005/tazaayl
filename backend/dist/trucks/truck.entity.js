@@ -23,6 +23,8 @@ let Truck = class Truck {
     model;
     status;
     capacity;
+    currentLat;
+    currentLon;
 };
 exports.Truck = Truck;
 __decorate([
@@ -49,6 +51,14 @@ __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", Number)
 ], Truck.prototype, "capacity", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'float', nullable: true }),
+    __metadata("design:type", Number)
+], Truck.prototype, "currentLat", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'float', nullable: true }),
+    __metadata("design:type", Number)
+], Truck.prototype, "currentLon", void 0);
 exports.Truck = Truck = __decorate([
     (0, typeorm_1.Entity)('trucks')
 ], Truck);

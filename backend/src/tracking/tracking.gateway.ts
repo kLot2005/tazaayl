@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GpsPoint } from './gps-point.entity';
+import { Truck } from '../trucks/truck.entity';
 import { StreetZonesService } from '../street-zones/street-zones.service';
 import { TelegramService } from '../telegram/telegram.service';
 
@@ -26,17 +27,20 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     constructor(
         @InjectRepository(GpsPoint)
         private gpsPointsRepository: Repository<GpsPoint>,
+        @InjectRepository(Truck)
+        private trucksRepository: Repository<Truck>,
         private streetZonesService: StreetZonesService,
         private telegramService: TelegramService,
     ) { }
 
     handleConnection(client: Socket) {
-        console.log(`Client connected: ${client.id}`);
     }
 
     handleDisconnect(client: Socket) {
-        console.log(`Client disconnected: ${client.id}`);
     }
+
+    // Кэш для предотвращения спама в Telegram (Date:TruckId:ZoneId)
+    private notifiedToday = new Set<string>();
 
     @SubscribeMessage('updateLocation')
     async handleLocationUpdate(
@@ -51,37 +55,53 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
                 coordinates: [data.longitude, data.latitude],
             },
         });
-        await this.gpsPointsRepository.save(point);
 
-        // 2. Проверяем вхождение в геозону
-        const zone = await this.streetZonesService.findContainingZone(data.longitude, data.latitude);
+        // Обновляем текущее положение в таблице машин
+        await Promise.all([
+            this.gpsPointsRepository.save(point),
+            this.trucksRepository.update(data.truckId, {
+                currentLat: data.latitude,
+                currentLon: data.longitude
+            })
+        ]);
 
-        if (zone) {
-            // Уведомляем админов
-            this.server.emit('truckEnteredZone', {
-                truckId: data.truckId,
-                zoneId: zone.id,
-                zoneName: (zone as any).name || 'Street Zone'
-            });
-
-            // Отправляем уведомления жителям через Telegram
-            await this.telegramService.notifyZoneSubscribers(
-                zone.id,
-                `🚛 Мусоровоз въехал на вашу улицу! Пожалуйста, выносите мусор.`
-            );
-
-            console.log(`Truck ${data.truckId} is in Zone ${zone.id}. Notifications sent.`);
-        }
-
-        // 3. Рассылаем всем текущее положение
+        // 2. СРАЗУ рассылаем всем текущее положение
         this.server.emit('locationUpdated', {
             truckId: data.truckId,
             latitude: data.latitude,
             longitude: data.longitude,
             timestamp: point.timestamp,
-            zoneId: zone?.id || null
         });
 
-        return { status: 'ok', inZone: !!zone };
+        // 3. Фоновая проверка геозон и уведомления (не блокирует основной поток)
+        try {
+            const zone = await this.streetZonesService.findContainingZone(data.longitude, data.latitude);
+
+            if (zone) {
+                const today = new Date().toISOString().split('T')[0];
+                const notificationKey = `${today}:${data.truckId}:${zone.id}`;
+
+                if (!this.notifiedToday.has(notificationKey)) {
+                    // Уведомляем админов в вебе
+                    this.server.emit('truckEnteredZone', {
+                        truckId: data.truckId,
+                        zoneId: zone.id,
+                        zoneName: (zone as any).name || 'Street Zone'
+                    });
+
+                    // Уведомляем жителей в Telegram
+                    await this.telegramService.notifyZoneSubscribers(
+                        zone.id,
+                        `🚛 Спецтехника Тазалык заехала в зону "${zone.name}". Скоро будем у вас!`
+                    );
+
+                    this.notifiedToday.add(notificationKey);
+                }
+            }
+        } catch (e) {
+            console.error(`[TrackingGateway] Error in zone processing:`, e.message);
+        }
+
+        return { status: 'ok' };
     }
 }

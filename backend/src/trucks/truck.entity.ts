@@ -26,4 +26,10 @@ export class Truck {
 
     @Column({ nullable: true })
     capacity: number; // Вместимость в кубометрах или тоннах
+
+    @Column({ type: 'float', nullable: true })
+    currentLat: number;
+
+    @Column({ type: 'float', nullable: true })
+    currentLon: number;
 }

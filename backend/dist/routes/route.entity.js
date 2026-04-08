@@ -29,7 +29,7 @@ __decorate([
     __metadata("design:type", String)
 ], Route.prototype, "date", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => truck_entity_1.Truck),
+    (0, typeorm_1.ManyToOne)(() => truck_entity_1.Truck, { nullable: true, onDelete: 'SET NULL' }),
     __metadata("design:type", truck_entity_1.Truck)
 ], Route.prototype, "truck", void 0);
 __decorate([
