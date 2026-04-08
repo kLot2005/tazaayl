@@ -50,7 +50,7 @@ export default function DriverPage() {
         fetchData();
 
         // Автоматически определяем адрес бэкенда из конфига API
-        const socketUrl = 'http://localhost:3005';
+        const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         console.log('[DriverPage] Connecting to socket:', socketUrl);
         const s = io(socketUrl, {
             transports: ['websocket', 'polling'],

@@ -1,0 +1,13 @@
+# Railway configuration for Tazaayl Monorepo
+
+[services.backend]
+source = "/backend"
+healthcheckPath = "/"
+healthcheckTimeout = 120
+buildPlan = { builder = "nixpacks" }
+
+[services.frontend]
+source = "/frontend"
+healthcheckPath = "/"
+healthcheckTimeout = 120
+buildPlan = { builder = "nixpacks" }
