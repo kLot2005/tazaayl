@@ -85,6 +85,25 @@ const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComple
                     id: 'zones-outline', type: 'line', source: 'zones',
                     paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-opacity': 0.8 }
                 });
+
+                // Слой с названиями зон
+                map.current.addLayer({
+                    id: 'zones-labels',
+                    type: 'symbol',
+                    source: 'zones',
+                    layout: {
+                        'text-field': ['get', 'name'],
+                        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 11,
+                        'text-anchor': 'center',
+                        'text-allow-overlap': false
+                    },
+                    paint: {
+                        'text-color': '#ffffff',
+                        'text-halo-color': 'rgba(0,0,0,0.8)',
+                        'text-halo-width': 1.5
+                    }
+                });
             }
 
             // Машины (Source)
