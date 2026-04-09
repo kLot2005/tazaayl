@@ -18,6 +18,7 @@ import {
     Filter
 } from 'lucide-react';
 import api from '@/lib/api';
+import { TableSkeleton } from '@/components/Skeleton';
 
 export default function TrucksPage() {
     const router = useRouter();
@@ -188,7 +189,13 @@ export default function TrucksPage() {
                         </thead>
                         <tbody className="divide-y divide-white/[0.02]">
                             <AnimatePresence mode='popLayout'>
-                                {filteredAndSortedTrucks.length > 0 ? (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={5} className="p-0">
+                                            <TableSkeleton />
+                                        </td>
+                                    </tr>
+                                ) : filteredAndSortedTrucks.length > 0 ? (
                                     filteredAndSortedTrucks.map((truck) => (
                                         <motion.tr
                                             layout

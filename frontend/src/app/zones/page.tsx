@@ -16,6 +16,7 @@ import {
     ArrowUpDown
 } from 'lucide-react';
 import api from '@/lib/api';
+import { TableSkeleton } from '@/components/Skeleton';
 
 export default function ZonesPage() {
     const router = useRouter();
@@ -189,7 +190,13 @@ export default function ZonesPage() {
                         </thead>
                         <tbody className="divide-y divide-white/[0.02]">
                             <AnimatePresence mode="popLayout">
-                                {filteredAndSortedZones.length > 0 ? (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={4} className="p-0">
+                                            <TableSkeleton />
+                                        </td>
+                                    </tr>
+                                ) : filteredAndSortedZones.length > 0 ? (
                                     filteredAndSortedZones.map((zone) => (
                                         <motion.tr
                                             layout

@@ -29,6 +29,7 @@ const FleetMap = dynamic(() => import('@/components/Map'), {
 });
 import api from '@/lib/api';
 import { io } from 'socket.io-client';
+import { StatSkeleton, Skeleton } from '@/components/Skeleton';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -156,14 +157,7 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  if (loading) return (
-    <div className="h-screen bg-[#050505] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <CircleDot className="w-8 h-8 text-emerald-500 animate-spin" />
-        <p className="text-zinc-600 font-bold uppercase tracking-[0.3em] text-[9px]">Syncing Data...</p>
-      </div>
-    </div>
-  );
+
 
   return (
     <div className="flex h-screen bg-[#050505] text-zinc-400 overflow-hidden font-sans antialiased">
@@ -221,9 +215,9 @@ export default function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Widget title="Активно в рейсе" value={stats.trucks.toString()} unit="Units" color="emerald" />
-          <Widget title="Оцифровано зон" value={stats.zones.toString()} unit="Sectors" color="blue" />
-          <Widget title="Плановых маршрутов" value={stats.routes.toString()} unit="Active" color="amber" />
+          <Widget title="Активно в рейсе" value={stats.trucks.toString()} unit="Units" color="emerald" loading={loading} />
+          <Widget title="Оцифровано зон" value={stats.zones.toString()} unit="Sectors" color="blue" loading={loading} />
+          <Widget title="Плановых маршрутов" value={stats.routes.toString()} unit="Active" color="amber" loading={loading} />
         </div>
 
         <div className="flex-1 min-h-0 relative rounded-2xl overflow-hidden border border-white/5 shadow-2xl glass no-scrollbar">
@@ -290,7 +284,8 @@ function NavItem({ icon, label, active = false, onClick }: { icon: any, label: s
   );
 }
 
-function Widget({ title, value, unit, color }: { title: string, value: string, unit: string, color: 'emerald' | 'blue' | 'amber' }) {
+function Widget({ title, value, unit, color, loading }: { title: string, value: string, unit: string, color: 'emerald' | 'blue' | 'amber', loading: boolean }) {
+  if (loading) return <StatSkeleton />;
   return (
     <div className="glass rounded-2xl p-5 border border-white/5 flex flex-col justify-center relative overflow-hidden group hover:border-emerald-500/20 transition-all duration-300">
       <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-3">{title}</p>

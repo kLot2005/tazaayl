@@ -54,3 +54,17 @@ body {
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
+
+/* Hide browser-specific input icons */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}
+
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button,
+input::-webkit-password-reveal {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}

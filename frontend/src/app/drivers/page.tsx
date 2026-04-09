@@ -17,6 +17,7 @@ import {
     ArrowUpDown
 } from 'lucide-react';
 import api from '@/lib/api';
+import { CardSkeleton } from '@/components/Skeleton';
 
 export default function DriversPage() {
     const router = useRouter();
@@ -205,7 +206,13 @@ export default function DriversPage() {
             {/* Drivers Grid */}
             <main className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatePresence mode="popLayout">
-                    {filteredAndSortedDrivers.map((driver) => (
+                    {loading ? (
+                        [...Array(3)].map((_, i) => (
+                            <motion.div key={`skeleton-${i}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                                <CardSkeleton />
+                            </motion.div>
+                        ))
+                    ) : filteredAndSortedDrivers.map((driver) => (
                         <motion.div
                             key={driver.id}
                             layout
