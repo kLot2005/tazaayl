@@ -28,7 +28,9 @@ import { ConfigModule } from '@nestjs/config';
         autoLoadEntities: true,
         synchronize: true,
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+        ssl: (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('internal'))
+          ? { rejectUnauthorized: false }
+          : false,
       }),
       dataSourceFactory: async (options) => {
         if (!options) throw new Error('Invalid options passed to TypeORM');
