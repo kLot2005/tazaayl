@@ -16,18 +16,28 @@ import { ConfigModule } from '@nestjs/config';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5435'),
-      username: process.env.DB_USER || 'user',
-      password: process.env.DB_PASSWORD || 'password',
-      database: process.env.DB_NAME || 'tazaayl',
-      autoLoadEntities: true,
-      synchronize: true, // В продакшене лучше false + migrations, но для старта на Railway сойдет
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+    TypeOrmModule.forRootAsync({
+      useFactory: () => ({
+        type: 'postgres',
+        url: process.env.DATABASE_URL,
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        username: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+        database: process.env.DB_NAME || 'tazaayl',
+        autoLoadEntities: true,
+        synchronize: true,
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+      }),
+      dataSourceFactory: async (options) => {
+        if (!options) throw new Error('Invalid options passed to TypeORM');
+        const { DataSource } = await import('typeorm');
+        const dataSource = new DataSource(options);
+        await dataSource.initialize();
+        await dataSource.query('CREATE EXTENSION IF NOT EXISTS postgis;');
+        return dataSource;
+      },
     }),
     AuthModule,
     UsersModule,
