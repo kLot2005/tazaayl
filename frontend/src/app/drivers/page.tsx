@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,7 +13,8 @@ import {
     MapPin,
     ShieldCheck,
     Plus,
-    Key
+    Key,
+    ArrowUpDown
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -25,6 +26,11 @@ export default function DriversPage() {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDriverId, setEditingDriverId] = useState<number | null>(null);
+
+    // Поиск и сортировка
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('username');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
     // Form State
     const [formData, setFormData] = useState({
@@ -117,10 +123,43 @@ export default function DriversPage() {
         }));
     };
 
+    // Обработка данных
+    const filteredAndSortedDrivers = useMemo(() => {
+        let result = [...drivers];
+
+        if (searchTerm) {
+            const lowSearch = searchTerm.toLowerCase();
+            result = result.filter(d =>
+                d.username?.toLowerCase().includes(lowSearch) ||
+                d.truck?.plateNumber?.toLowerCase().includes(lowSearch)
+            );
+        }
+
+        result.sort((a, b) => {
+            let valA = a[sortBy] || '';
+            let valB = b[sortBy] || '';
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return result;
+    }, [drivers, searchTerm, sortBy, sortOrder]);
+
+    const toggleSort = (field: string) => {
+        if (sortBy === field) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(field);
+            setSortOrder('asc');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#050505] text-white p-6 lg:p-10 font-sans antialiased">
             {/* Header */}
-            <header className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+            <header className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div>
                     <button
                         onClick={() => router.push('/')}
@@ -142,61 +181,92 @@ export default function DriversPage() {
                 </button>
             </header>
 
+            {/* Filters */}
+            <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 mb-8">
+                <div className="relative flex-1 group">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-emerald-500 transition-colors" />
+                    <input
+                        placeholder="ПОИСК ПО ИМЕНИ ИЛИ НОМЕРУ МАШИНЫ..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full bg-zinc-900/50 border border-white/5 rounded-2xl py-4 pl-14 pr-6 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-emerald-500/30 transition-all text-white placeholder:text-zinc-700"
+                    />
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => toggleSort('username')}
+                        className={`px-6 py-3 rounded-2xl border border-white/5 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${sortBy === 'username' ? 'bg-emerald-500 text-emerald-950 border-emerald-500' : 'bg-zinc-900/50 text-zinc-500 hover:text-white'}`}
+                    >
+                        <ArrowUpDown className="w-3 h-3" /> Сортировка А-Я
+                    </button>
+                </div>
+            </div>
+
             {/* Drivers Grid */}
             <main className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {drivers.map((driver) => (
-                    <motion.div
-                        key={driver.id}
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                        className="glass p-6 rounded-[2rem] border border-white/5 hover:border-emerald-500/20 transition-all group relative overflow-hidden"
-                    >
-                        <div className="flex items-start justify-between mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-500">
-                                <ShieldCheck className="w-6 h-6" />
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleOpenEdit(driver)}
-                                    className="p-2 bg-white/5 rounded-xl hover:bg-white/10 text-zinc-500 hover:text-white transition-all"
-                                >
-                                    <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(driver.id)}
-                                    className="p-2 bg-rose-500/5 rounded-xl hover:bg-rose-500/10 text-zinc-600 hover:text-rose-500 transition-all"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <h3 className="text-lg font-black uppercase tracking-tight mb-1">{driver.username}</h3>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6">Staff Level: Driver</p>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3 p-3 bg-white/[0.02] rounded-2xl border border-white/5">
-                                <TruckIcon className="w-4 h-4 text-zinc-500" />
-                                <div>
-                                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Машина</p>
-                                    <p className="text-[11px] font-bold text-emerald-500 uppercase">{driver.truck?.plateNumber || 'Не назначена'}</p>
+                <AnimatePresence mode="popLayout">
+                    {filteredAndSortedDrivers.map((driver) => (
+                        <motion.div
+                            key={driver.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="glass p-6 rounded-[2rem] border border-white/5 hover:border-emerald-500/20 transition-all group relative overflow-hidden"
+                        >
+                            <div className="flex items-start justify-between mb-6">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-500">
+                                    <ShieldCheck className="w-6 h-6" />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleOpenEdit(driver)}
+                                        className="p-2.5 bg-zinc-800 rounded-xl hover:bg-zinc-700 text-zinc-500 hover:text-white transition-all"
+                                    >
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(driver.id)}
+                                        className="p-2.5 bg-rose-500/5 rounded-xl hover:bg-rose-500/10 text-zinc-600 hover:text-rose-500 transition-all"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-1.5 pt-2">
-                                {driver.zones && driver.zones.length > 0 ? (
-                                    driver.zones.map((zone: any) => (
-                                        <div key={zone.id} className="px-2 py-1 bg-white/5 border border-white/5 rounded-lg flex items-center gap-1.5">
-                                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: zone.color }} />
-                                            <span className="text-[8px] font-black uppercase tracking-tight text-zinc-400">{zone.name}</span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest pl-1 italic">Зоны не привязаны</p>
-                                )}
+                            <h3 className="text-lg font-black uppercase tracking-tight mb-1">{driver.username}</h3>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6">Staff Level: Driver</p>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 p-3 bg-white/[0.02] rounded-2xl border border-white/5">
+                                    <TruckIcon className="w-4 h-4 text-zinc-500" />
+                                    <div>
+                                        <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Машина</p>
+                                        <p className="text-[11px] font-bold text-emerald-500 uppercase">{driver.truck?.plateNumber || 'Не назначена'}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5 pt-2">
+                                    {driver.zones && driver.zones.length > 0 ? (
+                                        driver.zones.map((zone: any) => (
+                                            <div key={zone.id} className="px-2 py-1 bg-white/5 border border-white/5 rounded-lg flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: zone.color }} />
+                                                <span className="text-[8px] font-black uppercase tracking-tight text-zinc-400">{zone.name}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest pl-1 italic">Зоны не привязаны</p>
+                                    )}
+                                </div>
                             </div>
+                        </motion.div>
+                    ))}
+                    {filteredAndSortedDrivers.length === 0 && !loading && (
+                        <div className="col-span-full py-20 text-center">
+                            <p className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.4em]">Водители не найдены</p>
                         </div>
-                    </motion.div>
-                ))}
+                    )}
+                </AnimatePresence>
             </main>
 
             {/* Modal */}
@@ -254,3 +324,5 @@ export default function DriversPage() {
         </div>
     );
 }
+
+
