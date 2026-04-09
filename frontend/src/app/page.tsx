@@ -23,7 +23,7 @@ import {
 import React from 'react';
 import dynamic from 'next/dynamic';
 
-const Map = dynamic(() => import('@/components/Map'), {
+const FleetMap = dynamic(() => import('@/components/Map'), {
   ssr: false,
   loading: () => <div className="w-full h-full bg-zinc-900 animate-pulse rounded-2xl flex items-center justify-center text-zinc-600 text-xs uppercase tracking-widest font-bold">Initializing Map...</div>
 });
@@ -80,18 +80,35 @@ export default function Dashboard() {
 
   useEffect(() => {
     const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005');
+
+    // Оптимизация обновлений (дросселирование)
+    let pendingUpdates = new Map<number, any>();
+    let throttleTimer: NodeJS.Timeout | null = null;
+
     socket.on('locationUpdated', (data) => {
-      setTrucks((prev) => {
-        const index = prev.findIndex(t => t.truckId === data.truckId);
-        if (index > -1) {
-          const newTrucks = [...prev];
-          newTrucks[index] = data;
-          return newTrucks;
-        }
-        return [...prev, data];
-      });
+      pendingUpdates.set(data.truckId, data);
+
+      if (!throttleTimer) {
+        throttleTimer = setTimeout(() => {
+          setTrucks((prev) => {
+            const newTrucks = [...prev];
+            pendingUpdates.forEach((val: any) => {
+              const idx = newTrucks.findIndex(t => t.truckId === val.truckId);
+              if (idx > -1) newTrucks[idx] = { ...newTrucks[idx], ...val };
+              else newTrucks.push(val);
+            });
+            pendingUpdates.clear();
+            return newTrucks;
+          });
+          throttleTimer = null;
+        }, 500);
+      }
     });
-    return () => { socket.disconnect(); };
+
+    return () => {
+      socket.disconnect();
+      if (throttleTimer) clearTimeout(throttleTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -210,7 +227,7 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 min-h-0 relative rounded-2xl overflow-hidden border border-white/5 shadow-2xl glass no-scrollbar">
-          <Map zones={zones} trucks={trucks} isDrawing={isDrawing} onDrawComplete={handleDrawComplete} />
+          <FleetMap zones={zones} trucks={trucks} isDrawing={isDrawing} onDrawComplete={handleDrawComplete} />
 
           <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
             {!isDrawing && !isSavingZone ? (

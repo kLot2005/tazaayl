@@ -15,7 +15,7 @@ import {
 import React from 'react';
 import dynamic from 'next/dynamic';
 
-const Map = dynamic(() => import('@/components/Map'), {
+const FleetMap = dynamic(() => import('@/components/Map'), {
     ssr: false,
     loading: () => <div className="w-full h-full bg-[#050505] flex items-center justify-center text-zinc-700 text-[10px] font-black uppercase tracking-[0.5em]">System Initializing...</div>
 });
@@ -46,19 +46,39 @@ export default function MonitoringPage() {
         fetchData();
         const socket = io('http://localhost:3005');
 
+        // Группировка обновлений для снижения частоты ререндеров
+        let pendingUpdates = new Map<number, any>();
+        let throttleTimer: NodeJS.Timeout | null = null;
+
         socket.on('locationUpdated', (data) => {
-            setTrucks((prev) => {
-                const index = prev.findIndex(t => t.truckId === data.truckId);
-                if (index > -1) {
-                    const newTrucks = [...prev];
-                    newTrucks[index] = data;
-                    return newTrucks;
-                }
-                return [...prev, data];
-            });
+            // Сохраняем последнее обновление для каждого трака
+            pendingUpdates.set(data.truckId, data);
+
+            // Если таймер не запущен, запускаем его
+            if (!throttleTimer) {
+                throttleTimer = setTimeout(() => {
+                    setTrucks((prev) => {
+                        const newTrucks = [...prev];
+                        pendingUpdates.forEach((updateData: any) => {
+                            const index = newTrucks.findIndex(t => t.truckId === updateData.truckId);
+                            if (index > -1) {
+                                newTrucks[index] = { ...newTrucks[index], ...updateData };
+                            } else {
+                                newTrucks.push(updateData);
+                            }
+                        });
+                        pendingUpdates.clear();
+                        return newTrucks;
+                    });
+                    throttleTimer = null;
+                }, 400); // Обновляем UI каждые 400мс (плавность сохранится за счет CSS анимаций в Map)
+            }
         });
 
-        return () => { socket.disconnect(); };
+        return () => {
+            socket.disconnect();
+            if (throttleTimer) clearTimeout(throttleTimer);
+        };
     }, []);
 
     const fetchData = async () => {
@@ -88,7 +108,7 @@ export default function MonitoringPage() {
     return (
         <div className="fixed inset-0 bg-black overflow-hidden flex flex-col font-sans antialiased text-white">
             <div className="absolute inset-0 z-0">
-                <Map zones={zones} trucks={trucks} />
+                <FleetMap zones={zones} trucks={trucks} />
             </div>
 
             <div className="absolute top-6 left-6 right-6 z-10 flex justify-between items-start pointer-events-none">
