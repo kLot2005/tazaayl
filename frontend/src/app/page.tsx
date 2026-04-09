@@ -45,6 +45,8 @@ export default function Dashboard() {
   const [isSavingZone, setIsSavingZone] = useState(false);
   const [newZoneName, setNewZoneName] = useState('');
   const [newZoneColor, setNewZoneColor] = useState('#10b981');
+  const [mapMode, setMapMode] = useState<'view' | 'draw' | 'edit'>('view');
+  const [selectedZone, setSelectedZone] = useState<any>(null);
 
   const fetchZones = async () => {
     try {
@@ -58,7 +60,7 @@ export default function Dashboard() {
 
   const handleDrawComplete = React.useCallback((polygon: any) => {
     setTempPolygon(polygon);
-    setIsDrawing(false);
+    setMapMode('view');
     setIsSavingZone(true);
   }, []);
 
@@ -76,6 +78,15 @@ export default function Dashboard() {
       fetchZones();
     } catch (err) {
       alert('Ошибка при сохранении зоны');
+    }
+  };
+
+  const handleZoneUpdate = async (zoneId: number, boundary: any) => {
+    try {
+      await api.patch(`/street-zones/${zoneId}`, { boundary });
+      fetchZones();
+    } catch (err) {
+      console.error('Failed to update zone boundary');
     }
   };
 
@@ -221,28 +232,56 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 min-h-0 relative rounded-2xl overflow-hidden border border-white/5 shadow-2xl glass no-scrollbar">
-          <FleetMap zones={zones} trucks={trucks} isDrawing={isDrawing} onDrawComplete={handleDrawComplete} />
+          <FleetMap
+            zones={zones}
+            trucks={trucks}
+            mode={mapMode}
+            onDrawComplete={handleDrawComplete}
+            onZoneUpdate={handleZoneUpdate}
+            onZoneSelect={(zone) => setSelectedZone(zone)}
+          />
 
           <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-            {!isDrawing && !isSavingZone ? (
-              <button onClick={() => setIsDrawing(true)} className="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95">
-                <Plus className="w-4 h-4" /> Оцифровать Зону
+            <div className="bg-zinc-900/80 backdrop-blur-md p-1.5 rounded-2xl border border-white/5 flex gap-1 shadow-2xl">
+              <button
+                onClick={() => { setMapMode('view'); setSelectedZone(null); }}
+                className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${mapMode === 'view' ? 'bg-emerald-500 text-emerald-950' : 'text-zinc-500 hover:text-white'}`}
+              >
+                Обзор
               </button>
-            ) : isDrawing ? (
-              <div className="flex flex-col gap-2 scale-in group">
-                <button onClick={() => setIsDrawing(false)} className="bg-rose-500 hover:bg-rose-400 text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95">
-                  <XCircle className="w-4 h-4" /> Отмена
+              <button
+                onClick={() => setMapMode('draw')}
+                className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${mapMode === 'draw' ? 'bg-emerald-500 text-emerald-950' : 'text-zinc-500 hover:text-white'}`}
+              >
+                Рисовать
+              </button>
+              <button
+                onClick={() => setMapMode('edit')}
+                className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${mapMode === 'edit' ? 'bg-emerald-500 text-emerald-950' : 'text-zinc-500 hover:text-white'}`}
+              >
+                Править
+              </button>
+            </div>
+
+            {mapMode === 'edit' && selectedZone && (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-zinc-900/95 backdrop-blur-2xl border border-emerald-500/30 p-4 rounded-2xl shadow-2xl w-64">
+                <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Редактирование зоны</p>
+                <h3 className="text-white font-bold text-sm mb-3 uppercase truncate">{selectedZone.name}</h3>
+                <p className="text-[10px] text-zinc-400 leading-relaxed mb-4">
+                  Перетащите белые точки на карте, чтобы изменить границы сектора. Изменения сохраняются автоматически.
+                </p>
+                <button onClick={() => { setMapMode('view'); setSelectedZone(null); }} className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all border border-emerald-500/20">
+                  Готово
                 </button>
-                <div className="bg-zinc-900/90 backdrop-blur-xl border border-white/10 p-3 rounded-xl shadow-2xl animate-bounce-subtle">
-                  <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Инструкция</p>
-                  <p className="text-[10px] text-zinc-300 font-bold leading-tight">
-                    • Ставьте точки кликом<br />
-                    • Двойной клик или <span className="text-white">Enter</span><br />
-                    <span className="text-emerald-500/50">завершают отрисовку</span>
-                  </p>
-                </div>
+              </motion.div>
+            )}
+
+            {mapMode === 'draw' && (
+              <div className="bg-emerald-500/10 backdrop-blur-xl border border-emerald-500/20 p-4 rounded-2xl shadow-2xl animate-pulse">
+                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mb-1">Режим рисования</p>
+                <p className="text-[10px] text-zinc-300 font-bold leading-tight uppercase">Кликайте по карте для создания точек. Двойной клик для завершения.</p>
               </div>
-            ) : null}
+            )}
           </div>
 
           <AnimatePresence>
