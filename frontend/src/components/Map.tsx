@@ -13,15 +13,18 @@ mapboxgl.accessToken = MAPBOX_TOKEN;
 interface MapProps {
     zones?: any[];
     trucks?: any[];
-    isDrawing?: boolean;
+    mode?: 'view' | 'draw' | 'edit';
     onDrawComplete?: (polygon: any) => void;
+    onZoneUpdate?: (zoneId: number, polygon: any) => void;
+    onZoneSelect?: (zone: any) => void;
 }
 
-const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComplete }: MapProps) => {
+const MapComponent = ({ zones = [], trucks = [], mode = 'view', onDrawComplete, onZoneUpdate, onZoneSelect }: MapProps) => {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map | null>(null);
     const draw = useRef<any>(null);
     const [styleLoaded, setStyleLoaded] = useState(false);
+    const editingZoneId = useRef<number | null>(null);
 
     // Реф для GeoJSON данных траков, чтобы избежать лишних аллокаций
     const trucksGeoJSON = useRef<GeoJSON.FeatureCollection>({
@@ -63,6 +66,18 @@ const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComple
                     'filter': ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
                     'layout': { 'line-cap': 'round', 'line-join': 'round' },
                     'paint': { 'line-color': '#10b981', 'line-width': 3 }
+                },
+                {
+                    'id': 'gl-draw-point-active',
+                    'type': 'circle',
+                    'filter': ['all', ['==', '$type', 'Point'], ['==', 'meta', 'feature']],
+                    'paint': { 'circle-radius': 7, 'circle-color': '#ffffff', 'circle-stroke-width': 2, 'circle-stroke-color': '#10b981' }
+                },
+                {
+                    'id': 'gl-draw-point-vertex-active',
+                    'type': 'circle',
+                    'filter': ['all', ['==', '$type', 'Point'], ['==', 'meta', 'vertex']],
+                    'paint': { 'circle-radius': 5, 'circle-color': '#10b981' }
                 }
             ]
         });
@@ -72,8 +87,6 @@ const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComple
 
         const onMapLoad = () => {
             if (!map.current) return;
-            console.log('[Map] Style loaded, initializing layers...');
-
             const m = map.current;
 
             // 1. Зоны
@@ -104,14 +117,9 @@ const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComple
                 });
             }
 
-            // 2. Траки (WebGL Layers для масштабируемости)
+            // 2. Траки
             if (!m.getSource('trucks')) {
-                m.addSource('trucks', {
-                    type: 'geojson',
-                    data: trucksGeoJSON.current,
-                    tolerance: 0
-                });
-
+                m.addSource('trucks', { type: 'geojson', data: trucksGeoJSON.current, tolerance: 0 });
                 m.addLayer({
                     id: 'trucks-point', type: 'circle', source: 'trucks',
                     paint: {
@@ -121,7 +129,6 @@ const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComple
                         'circle-stroke-color': '#ffffff',
                     }
                 });
-
                 m.addLayer({
                     id: 'trucks-labels', type: 'symbol', source: 'trucks',
                     layout: {
@@ -132,89 +139,98 @@ const MapComponent = ({ zones = [], trucks = [], isDrawing = false, onDrawComple
                         'text-anchor': 'top',
                         'text-allow-overlap': false
                     },
-                    paint: {
-                        'text-color': '#ffffff',
-                        'text-halo-color': '#000000',
-                        'text-halo-width': 2
-                    }
+                    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 2 }
                 });
             }
 
             setStyleLoaded(true);
+
+            m.on('click', 'zones-fill', (e) => {
+                if (mode !== 'edit') return;
+                const feature = e.features?.[0];
+                if (!feature || !draw.current) return;
+                const zoneId = feature.properties?.id;
+                if (!zoneId) return;
+
+                editingZoneId.current = zoneId;
+                draw.current.deleteAll();
+                const ids = draw.current.add(feature);
+                draw.current.changeMode('direct_select', { featureId: ids[0] });
+                if (onZoneSelect) onZoneSelect(feature.properties);
+            });
+
+            m.on('mouseenter', 'zones-fill', () => {
+                if (mode === 'edit') m.getCanvas().style.cursor = 'pointer';
+            });
+            m.on('mouseleave', 'zones-fill', () => { m.getCanvas().style.cursor = ''; });
         };
 
         map.current.on('style.load', onMapLoad);
-        map.current.on('load', onMapLoad);
 
         map.current.on('draw.create', (e: any) => {
             const feature = e.features[0];
             if (onDrawCompleteRef.current) onDrawCompleteRef.current(feature.geometry);
         });
 
-        // Исправлено: добавление map.remove() для предотвращения утечек памяти
+        map.current.on('draw.update', (e: any) => {
+            const feature = e.features[0];
+            if (editingZoneId.current && onZoneUpdate) {
+                onZoneUpdate(editingZoneId.current, feature.geometry);
+            }
+        });
+
         return () => {
             if (map.current) {
-                console.log('[Map] Cleaning up map instance...');
                 map.current.remove();
                 map.current = null;
                 setStyleLoaded(false);
             }
         };
-    }, [isTokenValid]);
+    }, [isTokenValid, mode]); // Перезапускаем при смене режима для обновления слушателей
 
     useEffect(() => {
         if (!draw.current || !map.current || !styleLoaded) return;
         try {
-            if (isDrawing) {
+            if (mode === 'draw') {
                 draw.current.changeMode('draw_polygon');
             } else {
                 draw.current.changeMode('simple_select');
-                draw.current.deleteAll();
+                if (mode === 'view') {
+                    draw.current.deleteAll();
+                    editingZoneId.current = null;
+                }
             }
         } catch (e) { }
-    }, [isDrawing, styleLoaded]);
+    }, [mode, styleLoaded]);
 
-    const updateZones = (zonesData: any[]) => {
+    useEffect(() => {
         if (!map.current || !styleLoaded) return;
         const source = map.current.getSource('zones') as mapboxgl.GeoJSONSource;
         if (source) {
             source.setData({
                 type: 'FeatureCollection',
-                features: (zonesData || []).map(z => ({
+                features: (zones || []).map(z => ({
                     type: 'Feature',
                     geometry: z.boundary,
                     properties: { id: z.id, name: z.name || 'Unnamed', color: z.color || '#10b981' }
                 }))
             });
         }
-    };
+    }, [zones, styleLoaded]);
 
-    const updateTrucksLayer = (trucksData: any[]) => {
+    useEffect(() => {
         if (!map.current || !styleLoaded) return;
         const source = map.current.getSource('trucks') as mapboxgl.GeoJSONSource;
         if (source) {
-            // Оптимизация: мутируем реф вместо создания новых объектов
-            trucksGeoJSON.current.features = (trucksData || [])
+            trucksGeoJSON.current.features = (trucks || [])
                 .filter(t => t.latitude && t.longitude)
                 .map(t => ({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: [Number(t.longitude), Number(t.latitude)] },
-                    properties: {
-                        id: t.truckId,
-                        plate: t.plateNumber || `${t.truckId}`
-                    }
+                    properties: { id: t.truckId, plate: t.plateNumber || `${t.truckId}` }
                 } as any));
-
             source.setData(trucksGeoJSON.current);
         }
-    };
-
-    useEffect(() => {
-        if (styleLoaded) updateZones(zones);
-    }, [zones, styleLoaded]);
-
-    useEffect(() => {
-        if (styleLoaded) updateTrucksLayer(trucks);
     }, [trucks, styleLoaded]);
 
     if (!isTokenValid) {
